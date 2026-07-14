@@ -174,22 +174,14 @@ SMTP_PROVIDERS = {
 
     # --- NetEase Enterprise / Lingxi ---
     "qiye.163.com": {
-        "smtp_server": "smtphz.qiye.163.com",
+        "smtp_server": "smtp.qiye.163.com",
         "smtp_port": 465,
         "ssl_mode": "ssl",
         "auth_type": "password_or_auth_code",
         "provider_name": "網易企業郵箱 / 靈犀",
         "auth_label": "登入密碼或授權碼",
         "instructions": "網易企業郵箱使用登入密碼。若報 ERR.LOGIN.REQCODE，請至網頁郵箱設定生成授權碼。",
-    },
-    "ntes53.netease.com": {
-        "smtp_server": "smtpv6hz.qiye.ntes53.netease.com",
-        "smtp_port": 587,
-        "ssl_mode": "starttls",
-        "auth_type": "password_or_auth_code",
-        "provider_name": "網易企業郵箱 / 靈犀 (新節點)",
-        "auth_label": "登入密碼或授權碼",
-        "instructions": "網易企業郵箱新節點，使用連接埠 587 + STARTTLS，支援 IPv6。",
+        "backup_smtp_servers": ["smtpv6hz.qiye.ntes53.netease.com"],
     },
 
     # --- QQ Mail / Foxmail ---
@@ -401,13 +393,6 @@ def detect_smtp_provider(email):
     # Check for NetEase enterprise subdomains (*.qiye.163.com)
     if domain.endswith(".qiye.163.com") or domain == "qiye.163.com":
         result = dict(SMTP_PROVIDERS["qiye.163.com"])
-        result["domain"] = domain
-        result["email"] = email
-        return result
-
-    # Check for NetEase enterprise new-node subdomains (*.qiye.ntes53.netease.com)
-    if domain.endswith(".qiye.ntes53.netease.com") or domain == "qiye.ntes53.netease.com" or domain == "ntes53.netease.com":
-        result = dict(SMTP_PROVIDERS["ntes53.netease.com"])
         result["domain"] = domain
         result["email"] = email
         return result

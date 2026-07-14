@@ -9,7 +9,7 @@
 - **汎用相容** — 支援 Gmail、Outlook、網易(163/126/yeah/企業/靈犀)、QQ、iCloud、Yahoo 等所有電子郵件系統
 - **自動偵測** — 根據郵箱地址自動識別提供商並帶入 SMTP 設定
 - **無設定檔** — 不依賴任何持久化設定，每次使用時現場詢問，適合多人共用
-- **互動式表單** — 所有使用者輸入均透過 `AskUserQuestion` 工具提供互動式輸入框，支援快捷選項與自定義填寫
+- **互動式表單** — 所有使用者輸入均透過 `AskUserQuestion` 工具提供互動式輸入框，options 數量按情況靈活決定（0~4 個），支援快捷選項與自定義填寫
 - **AI 智能生成內文** — 可選擇由 AI 根據主旨和附件自動生成專業郵件內文，或自行填寫
 - **附件支援** — 點選方式選擇是否附加檔案
 - **發送前確認** — 預覽完整郵件後才發送，支援確認/修改/捨棄
@@ -19,7 +19,7 @@
 
 ## 安裝
 
-將整個 `CC-EmailSender` 資料夾放到 `~/.workbuddy/skills/` 目錄下。
+將整個 `CC-EmailSender` 資料夾放到 `~/.workbuddy/skills/` 目錄下（Windows 上為 `C:\Users\<使用者>\.workbuddy\skills\`）。
 
 ## 使用方式
 
@@ -37,7 +37,7 @@
 ### 完整流程（6 步）
 
 ```
-第 1 步：寄件人設定 — 判斷是否已提供郵箱 → 自動偵測 SMTP → 輸入密碼/授權碼 → 測試連線
+第 1 步：寄件人設定 — 取得郵箱地址 → 判斷郵箱種類 → SMTP 伺服器偵測與連接（四級 fallback）→ 輸入密碼/授權碼 → 驗證登入
 第 2 步：互動式表單撰寫郵件（收件人/抄送/暗送/主旨 + 內文 AI 生成或自行填寫）
 第 3 步：附件（點選是否附加）
 第 4 步：生成完整郵件 → 預覽 → 確認/修改/捨棄
@@ -47,36 +47,54 @@
 
 #### 第 1 步：寄件人設定
 
-**1a. 判斷寄件人郵箱**
+**1a. 取得郵箱地址**
 
 系統首先掃描使用者的觸發訊息，判斷是否已包含郵箱地址：
 
-- **已提供郵箱** → 直接使用，跳過詢問，立即執行 SMTP 偵測
-- **未提供郵箱** → 透過 `AskUserQuestion` 提供互動式輸入框，包含 Gmail / 網易QQ / Outlook 三個快捷選項，使用者點選後透過底部 **Other 自定義輸入框** 輸入完整郵箱地址
+- **已提供郵箱** → 直接使用，跳過詢問，立即進入 1b 判斷郵箱種類
+- **未提供郵箱** → 透過 `AskUserQuestion` 提供一個純輸入框（無預設選項），使用者透過底部 **Other 自定義輸入框** 輸入完整郵箱地址
 
-**1a-偵測：SMTP 自動偵測**
+**1b. 判斷郵箱種類**
 
-取得郵箱後，系統自動偵測所屬提供商和 SMTP 設定：
+取得郵箱地址後，系統根據域名判斷郵箱種類。定義四種常用郵箱：**網易**、**Outlook**、**QQ**、**Gmail**。
 
-- `@gmail.com` → Gmail（需應用專用密碼）
-- `@outlook.com` / `@hotmail.com` → Outlook（需帳戶密碼）
-- `@163.com` / `@126.com` → 網易（需授權碼）
-- `@qiye.163.com` → 網易企業郵箱/靈犀（需密碼或授權碼）
-- `@qq.com` → QQ 郵箱（需授權碼）
-- `@icloud.com` → iCloud（需應用專用密碼）
-- 未知域名 → 透過 `AskUserQuestion` 讓使用者選擇加密方式（SSL/STARTTLS/不加密）並提供 SMTP 伺服器位址
+**情況 A — 系統能判斷郵箱種類：**
 
-**1b. 取得密碼/授權碼**
+告知使用者判斷結果，並透過 `AskUserQuestion` 提供以下選項：
 
-透過 `AskUserQuestion` 提供輸入框，包含三個認證方式選項：
+- 若判斷結果屬於四種常用郵箱之一：選項 (1) = 判斷正確，(2)(3)(4) = 其餘三種常用郵箱
+- 若判斷結果不屬於四種常用郵箱：選項 (1) = 判斷正確，(2)(3)(4) = 前三種常用郵箱（網易、Outlook、QQ）
+- 底部均提供 **Other 自定義輸入框**，供使用者自行填寫
 
-| 選項 | 適用提供商 | 取得方式 |
-|------|-----------|---------|
-| 授權碼 | 網易/QQ | 網頁郵箱 → 設定 → POP3/SMTP/IMAP → 開啟 → 生成授權碼 |
-| 應用專用密碼 | Gmail/iCloud/Yahoo | 帳戶設定 → 安全性 → 兩步驟驗證 → 應用專用密碼 |
-| 登入密碼 | Outlook/企業郵箱 | 直接使用登入密碼 |
+使用者選擇「判斷正確」或選擇其他選項後，進入 SMTP 偵測。
 
-使用者點選對應選項後，透過 **Other 自定義輸入框** 輸入密碼/授權碼。系統立即測試 SMTP 連線，確認認證有效後才進入下一步。
+**情況 B — 系統無法判斷郵箱種類：**
+
+直接透過 `AskUserQuestion` 提供四種常用郵箱選項 + Other 自定義輸入框，讓使用者自行選擇。
+
+**1c. SMTP 伺服器偵測與連接**
+
+確認郵箱種類後，系統按四級 fallback 流程取得 SMTP 設定並驗證伺服器可達。每一步找到設定後先做 TCP 連線測試，成功則進入 1d，失敗則繼續下一步：
+
+| 順序 | 來源 | 說明 |
+|------|------|------|
+| (1) | **預設值** | 部分郵箱種類有預設 SMTP 位址。目前網易郵箱預設主伺服器為 `smtp.qiye.163.com:465 SSL`，備用伺服器為 `smtpv6hz.qiye.ntes53.netease.com:465 SSL`（主伺服器連線失敗時自動切換） |
+| (2) | **references/smtp_settings.md** | 從技能內建設定參考檔中根據域名匹配 SMTP 伺服器、連接埠、加密方式 |
+| (3) | **WebSearch 線上檢索** | 自動搜尋網路上該域名的 SMTP 設定，逐一嘗試 TCP 連線 |
+| (4) | **使用者手動填寫** | 提供互動式輸入框讓使用者自行輸入 SMTP 伺服器位址與加密方式 |
+
+> TCP 連線測試僅驗證伺服器是否可達，不需要密碼。若回傳「認證失敗」表示伺服器可達，視為連接成功。
+
+**1d. 取得密碼 / 授權碼並驗證登入**
+
+1c 確認伺服器可達後，系統透過 `AskUserQuestion` 提供一個文字輸入框，讓使用者輸入密碼/授權碼/應用專用密碼（根據郵箱種類提示對應的認證方式）。
+
+使用者輸入密碼後，系統執行 SMTP 連線測試驗證登入：
+
+- **登入成功** → 進入第 2 步撰寫郵件
+- **登入失敗** → 提供二選一：(1) 重新輸入密碼 (2) 重新輸入郵箱（退回步驟 1a）
+
+**安全提醒：密碼僅存在於當前對話的臨時變數中，不儲存、不回顯。**
 
 #### 第 2 步：互動式表單撰寫
 
@@ -135,14 +153,14 @@
 ### 偵測 SMTP 設定
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --detect-smtp "user@gmail.com"
 ```
 
 ### 測試連線
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --test-connection \
   --sender "user@gmail.com" \
   --smtp-server "smtp.gmail.com" --smtp-port 465 --ssl-mode ssl \
@@ -152,7 +170,7 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
 ### 預覽郵件
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --preview \
   --sender "user@gmail.com" \
   --smtp-server "smtp.gmail.com" --smtp-port 465 --ssl-mode ssl \
@@ -165,7 +183,7 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
 ### 發送郵件
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --sender "user@gmail.com" \
   --smtp-server "smtp.gmail.com" --smtp-port 465 --ssl-mode ssl \
   --password "app_password" \
@@ -251,6 +269,8 @@ CC-EmailSender/
 - Outlook → 使用帳戶密碼（若啟用兩步驗證則用應用專用密碼）
 - 網易企業郵箱 → 先試登入密碼，若報 `ERR.LOGIN.REQCODE` 則生成授權碼
 
+系統會提供兩個選項：**重新輸入密碼** 或 **重新輸入郵箱**（退回步驟 1a）。
+
 ### Q: 發送失敗，提示「無法連接 SMTP 伺服器」
 
 - 檢查 SMTP 伺服器位址和連接埠是否正確
@@ -259,7 +279,7 @@ CC-EmailSender/
 
 ### Q: 我的郵箱域名無法自動識別
 
-企業或自定義域名郵箱需要手動提供 SMTP 設定。系統會透過互動式輸入框讓你選擇加密方式並輸入 SMTP 伺服器位址。請向 IT 管理員確認：
+系統會按四級 fallback 流程嘗試連接 SMTP 伺服器：預設值 → 設定參考檔 → 線上檢索 → 使用者手動填寫。若前三步均無法找到可達的伺服器，系統會提供互動式輸入框讓你自行輸入 SMTP 伺服器位址和加密方式。請向 IT 管理員確認：
 - SMTP 伺服器位址
 - 連接埠（通常 465 或 587）
 - 加密方式（SSL 或 STARTTLS）

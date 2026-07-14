@@ -12,7 +12,7 @@ agent_created: true
 ## 前置需求
 
 - Python 3.x + 標準庫（無外部依賴）
-- 腳本路徑: `~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py`
+- 腳本路徑: `C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py`
 
 ---
 
@@ -45,15 +45,16 @@ agent_created: true
 > 使用者可點選預設選項，也可透過底部的 **Other 自定義輸入框** 輸入任意文字。
 >
 > **設計原則：**
-> - 每個 `question` 的 `options` 至少 2 個，包含合理預設值或快捷選項。
-> - 使用者需自由輸入文字時，點選對應 option 後在 **Other** 輸入框中填寫。
+> - `options` 數量按情況靈活決定，可為 0~4 個。當只需使用者自由輸入文字時，可提供 1 個提示性 option 或不提供 option，使用者透過底部 **Other 自定義輸入框** 輸入。
+> - 當存在合理預設值或快捷選項時，提供對應的 options 供使用者點選。
+> - 使用者需自由輸入文字時，點選對應 option 後在 **Other** 輸入框中填寫，或直接在 Other 中輸入。
 > - 多個獨立欄位可在同一個 `AskUserQuestion` 中同時呈現（最多 4 個 question）。
 
 ---
 
-### 第 1 步：寄件人設定（郵箱 → 服務商分析與確認 → 偵測 → 密碼）
+### 第 1 步：寄件人設定（郵箱 → 判斷種類 → SMTP 設定 → 密碼登入驗證）
 
-#### 1a. 判斷並取得寄件人郵箱
+#### 1a. 取得寄件人郵箱地址
 
 **首先判斷使用者是否已在初始訊息中提供寄件人郵箱地址。**
 
@@ -61,150 +62,223 @@ agent_created: true
 
 **情況 A — 使用者已提供寄件人郵箱：**
 
-直接使用該郵箱作為寄件人，**無需再次詢問**。
-立即進入服務商分析（見 1b-服務商分析與確認）。
+直接使用該郵箱作為寄件人，**無需再次詢問**。立即執行 1b（郵箱種類判斷）。
 
 **情況 B — 使用者未提供寄件人郵箱：**
 
-僅顯示一個輸入框，讓使用者直接輸入寄件人郵箱地址，不要在同一步驟中混入服務商選項：
+使用 `AskUserQuestion` 提供一個純輸入介面，讓使用者輸入自定義郵箱地址。**此步驟不提供任何郵箱類型選項**，僅提供一個輸入框讓使用者輸入自定義文字：
 
 ```json
 {
   "questions": [{
     "question": "請輸入寄件人郵箱地址",
-    "header": "寄件人郵箱",
-    "options": []
+    "header": "寄件人郵箱"
   }]
 }
 ```
 
-使用者透過底部 **Other 自定義輸入框** 輸入完整郵箱地址後，進入 1b 的服務商分析與確認。
+> **注意：此步驟不提供郵箱類型選項（如 Gmail、網易、QQ 等），僅提供一個純文字輸入框讓使用者輸入自定義郵箱地址。上方的兩個 option 僅為提示性文字，真正的郵箱地址透過底部 Other 輸入框取得。**
 
-#### 1b. 郵箱服務商分析與確認
+使用者透過底部 **Other 自定義輸入框** 輸入完整郵箱地址後，繼續執行 1b。
 
-**取得寄件人郵箱後，首先根據郵箱域名分析其所屬服務商，然後讓使用者確認分析是否正確。**
+#### 1b. 判斷郵箱種類
 
-##### 域名分析規則（依程式邏輯判斷，不呼叫外部命令）
+取得寄件人郵箱地址後，根據郵箱域名判斷郵箱種類。
 
-根據郵箱地址的 @ 後綴進行分析：
+**四種常用郵箱定義：**
 
-| 域名後綴 | 服務商 |
-|---------|--------|
-| `@gmail.com` | Gmail |
-| `@outlook.com` / `@hotmail.com` / `@live.com` / `@msn.com` | Outlook |
-| `@qq.com` / `@foxmail.com` / `@vip.qq.com` | QQ郵箱 |
-| `@163.com` / `@126.com` / `@yeah.net` / `@188.com` | 網易 |
-| `@qiye.163.com` / `@ntes53.netease.com` | 網易企業郵箱/靈犀 |
-| `@yahoo.com` / `@yahoo.com.tw` / `@yahoo.co.jp` | Yahoo |
-| `@icloud.com` / `@me.com` / `@mac.com` | iCloud |
-| `@sina.com` / `@sina.cn` | 新浪 |
-| `@sohu.com` | 搜狐 |
-| `@aliyun.com` | 阿里雲 |
-| `@zoho.com` | Zoho |
-| 無法匹配以上規則 | 未知服務商 / 企業自定義域名 |
+| 種類 | 涵蓋域名 |
+|------|----------|
+| 網易 | 163.com, 126.com, yeah.net, qiye.163.com, 188.com |
+| Outlook | outlook.com, hotmail.com, live.com, office365.com, msn.com |
+| QQ | qq.com, foxmail.com, vip.qq.com |
+| Gmail | gmail.com, googlemail.com |
 
-##### 使用 AskUserQuestion 讓使用者確認分析結果
+**判斷邏輯：** 掃描郵箱地址的域名部分（@ 之後），與上表進行比對。
+
+---
+
+**情況 A — 能判斷郵箱種類：**
+
+告訴使用者判斷結果，並使用 `AskUserQuestion` 提供以下選項供使用者確認。
+
+**選項構建規則：**
+- 選項 (1)：判斷正確（[判斷出的種類]）→ 繼續執行
+- 若判斷結果是四種常用郵箱之一，選項 (2)(3)(4) = 另外三種常用郵箱
+- 若判斷結果不屬於四種常用郵箱（如 Yahoo、iCloud、Zoho 等），選項 (2)(3)(4) = 前三種常用郵箱（網易、Outlook、QQ）
+- **Other 輸入區**：若以上選項都不對，使用者在此自行填寫正確的郵箱種類
+
+**範例 — 判斷為 Gmail（屬於四種常用之一，其餘三種為網易、Outlook、QQ）：**
 
 ```json
 {
   "questions": [{
-    "question": "分析您的郵箱為 **［服務商名稱］**，是否正確？",
-    "header": "服務商確認",
+    "question": "根據您的郵箱地址，判斷為 **Gmail** 郵箱。請確認是否正確？",
+    "header": "確認郵箱種類",
     "options": [
-      {"label": "正確", "description": "服務商識別正確，繼續執行 SMTP 偵測"},
-      {"label": "不正確", "description": "服務商識別錯誤，重新選擇服務商"}
+      {"label": "判斷正確：Gmail", "description": "確認為 Gmail，繼續執行"},
+      {"label": "應為：網易", "description": "實際為網易(163/126/yeah)郵箱"},
+      {"label": "應為：Outlook", "description": "實際為 Outlook/Hotmail 郵箱"},
+      {"label": "應為：QQ", "description": "實際為 QQ/Foxmail 郵箱"}
     ]
   }]
 }
 ```
 
-**處理邏輯：**
-
-**若選「正確」：** 使用已分析的服務商資訊，繼續執行 SMTP 偵測（見 1c-偵測）。
-
-**若選「不正確」：** 使用第二個 `AskUserQuestion` 提供四個主要選項，並在 Other 中提供手動輸入框：
+**範例 — 判斷為 QQ（屬於四種常用之一，其餘三種為網易、Outlook、Gmail）：**
 
 ```json
 {
   "questions": [{
-    "question": "請選擇正確的郵箱服務商，或在下方 Other 中輸入自定義服務商名稱",
-    "header": "選擇服務商",
+    "question": "根據您的郵箱地址，判斷為 **QQ** 郵箱。請確認是否正確？",
+    "header": "確認郵箱種類",
     "options": [
-      {"label": "網易", "description": "163/126/yeah.net/企業郵箱等"},
-      {"label": "Outlook", "description": "Outlook/Hotmail/Live/Office365"},
-      {"label": "QQ郵箱", "description": "QQ/Foxmail 郵箱"},
-      {"label": "Gmail", "description": "Google Gmail 郵箱服務"}
+      {"label": "判斷正確：QQ", "description": "確認為 QQ/Foxmail，繼續執行"},
+      {"label": "應為：網易", "description": "實際為網易(163/126/yeah)郵箱"},
+      {"label": "應為：Outlook", "description": "實際為 Outlook/Hotmail 郵箱"},
+      {"label": "應為：Gmail", "description": "實際為 Gmail 郵箱"}
     ]
   }]
 }
 ```
 
-- 若使用者點選上述四個選項之一 → 記錄所選服務商。
-- 若使用者點選 **Other** → 在手動輸入框中填寫自定義服務商名稱（如"新浪"、"iCloud"、"企業自定義"等）。
-- 記錄最終確定的服務商名稱後，繼續執行 SMTP 偵測（見 1c-偵測）。
+**範例 — 判斷為 Yahoo（不屬於四種常用，選項 2~4 為前三種常用郵箱）：**
 
-> **設計原則：** 即使使用者糾正了服務商，後續的 `--detect-smtp` 腳本仍然會根據郵箱首碼進行自動偵測。使用者的選擇主要用於引導後續的密碼類型提示（授權碼 vs 應用專用密碼 vs 登入密碼）。
+```json
+{
+  "questions": [{
+    "question": "根據您的郵箱地址，判斷為 **Yahoo** 郵箱。請確認是否正確？",
+    "header": "確認郵箱種類",
+    "options": [
+      {"label": "判斷正確：Yahoo", "description": "確認為 Yahoo，繼續執行"},
+      {"label": "應為：網易", "description": "實際為網易(163/126/yeah)郵箱"},
+      {"label": "應為：Outlook", "description": "實際為 Outlook/Hotmail 郵箱"},
+      {"label": "應為：QQ", "description": "實際為 QQ/Foxmail 郵箱"}
+    ]
+  }]
+}
+```
 
-#### 1c-偵測：SMTP 自動偵測 + 配置表直接匹配
+---
 
-**此步驟結合自動偵測與 SMTP 配置表直接匹配，確保即使自動偵測失敗也能找到伺服器設定。**
+**情況 B — 無法判斷郵箱種類：**
 
-##### 第 1 階段：自動偵測
+使用 `AskUserQuestion` 提供四種常用郵箱供使用者選擇，以及 Other 輸入區：
 
-取得寄件人郵箱並確認服務商後，執行偵測命令：
+```json
+{
+  "questions": [{
+    "question": "無法自動判斷您的郵箱種類，請選擇您的郵箱類型：",
+    "header": "選擇郵箱種類",
+    "options": [
+      {"label": "網易", "description": "163/126/yeah/企業郵箱等網易系郵箱"},
+      {"label": "Outlook", "description": "Outlook/Hotmail/Live/Office365 郵箱"},
+      {"label": "QQ", "description": "QQ/Foxmail 郵箱"},
+      {"label": "Gmail", "description": "Google Gmail 郵箱"}
+    ]
+  }]
+}
+```
+
+若使用者透過 **Other** 輸入自定義類型，記錄使用者提供的類型名稱。
+
+---
+
+**確認後：** 根據使用者確認或選擇的郵箱種類，執行 SMTP 偵測（見 1c）。
+
+#### 1c. SMTP 伺服器設定（直接確定，不做 TCP 預測試）
+
+確認郵箱種類後，按以下順序嘗試取得 SMTP 伺服器設定。**不做 TCP 連線預測試**，直接將設定傳遞給 1d，由登入驗證（含真實密碼）一併確認連線與認證。
+
+---
+
+**第 (1) 步：查詢預設值**
+
+部分郵箱種類有預設的 SMTP 設定，直接使用預設值：
+
+| 郵箱種類 | 主 SMTP 伺服器 | 備用 SMTP 伺服器 | 連接埠 | 加密方式 |
+|----------|---------------|-----------------|--------|---------|
+| 網易 | `smtp.qiye.163.com` | `smtpv6hz.qiye.ntes53.netease.com` | 465 | SSL |
+
+> 若使用者確認的郵箱種類在上表中，**使用主伺服器**作為預設 SMTP 設定。
+> 若不在上表中（如 Gmail、Outlook、QQ 等），跳到第 (2) 步。
+
+---
+
+**第 (2) 步：從 `--detect-smtp` 與 references/smtp_settings.md 匹配**
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py --detect-smtp "使用者郵箱"
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --detect-smtp "使用者郵箱"
 ```
 
-回傳 JSON 含 `provider_name`、`smtp_server`、`smtp_port`、`ssl_mode`、`auth_type`。
+同時參考 `references/smtp_settings.md` 中對應郵箱種類的設定，取兩者中更精確的值。
 
-- **已知（smtp_server 非空）** → "已識別為 **[provider_name]**，伺服器 `[server]:[port]`。" → 直接跳至 1d。
-- **未知（smtp_server 為 null）** → 進入第 2 階段：SMTP 配置表直接匹配。
+**找到匹配設定** → 直接使用匹配到的 SMTP 伺服器、連接埠、加密方式，進入 1d。
 
-##### 第 2 階段：SMTP 配置表直接匹配
+**未找到匹配設定** → 直接進入第 (3) 步。
 
-當自動偵測無法識別服務商時（常見於企業自定義域名、新域名或服務商變更），使用下方的 **SMTP 服務商配置表** 進行直接匹配。
+---
 
-**匹配規則（依序列舉，返回第一個匹配結果）：**
+**第 (3) 步：自動檢索網路上的匹配地址**
 
-1. **精確域名匹配** — 將使用者的郵箱域名與配置表中的 `domain_pattern` 逐一比對
-2. **服務商名稱匹配** — 若使用者在 1b 步驟中已手動選擇或輸入服務商名稱，直接匹配配置表中的 `provider_name`
-3. **使用者手動指定** — 若以上均不匹配，詢問使用者是否知道 SMTP 伺服器位址，或從配置表中選擇服務商
+使用 `WebSearch` 工具，搜尋該郵箱域名對應的 SMTP 伺服器設定。
 
-**使用 AskUserQuestion 呈現服務商選擇（當自動偵測失敗時）：**
+搜尋關鍵詞範例：
+- `"{域名} SMTP server settings port"
+- `"{域名} SMTP 伺服器 連接埠 SSL`
+
+從搜尋結果中提取 SMTP 伺服器位址、連接埠、加密方式。
+
+**搜尋到設定** → 直接使用搜尋到的 SMTP 設定，進入 1d。
+
+**搜尋失敗** → 進入第 (4) 步。
+
+---
+
+**第 (4) 步：要求使用者自行填寫**
+
+使用 `AskUserQuestion` 讓使用者提供 SMTP 伺服器資訊：
 
 ```json
 {
-  "questions": [{
-    "question": "自動偵測未找到此郵箱的 SMTP 設定。請選擇您的郵箱服務商，系統將自動填入配置：",
-    "header": "選擇服務商",
-    "options": [
-      {"label": "網易企業郵箱", "description": "smtp.qiye.163.com:465 或 smtpv6hz.qiye.ntes53.netease.com:587"},
-      {"label": "網易 163", "description": "smtp.163.com:465 (SSL)"},
-      {"label": "QQ 郵箱", "description": "smtp.qq.com:465 (SSL)"},
-      {"label": "Gmail", "description": "smtp.gmail.com:465 (SSL)"},
-      {"label": "Outlook", "description": "smtp-mail.outlook.com:587 (STARTTLS)"},
-      {"label": "其他 / 自定義", "description": "手動輸入 SMTP 伺服器位址與連接埠"}
-    ]
-  }]
+  "questions": [
+    {
+      "question": "無法自動偵測您的 SMTP 伺服器，請輸入 SMTP 伺服器位址（如 smtp.example.com）",
+      "header": "SMTP 伺服器",
+      "options": [
+      ]
+    },
+    {
+      "question": "請選擇加密方式",
+      "header": "加密方式",
+      "options": [
+        {"label": "SSL（連接埠 465）", "description": "連線時直接加密，推薦使用"},
+        {"label": "STARTTLS（連接埠 587）", "description": "先建立普通連線再升級為加密連線"},
+        {"label": "不加密（連接埠 25）", "description": "不加密，不推薦，可能被封鎖"}
+      ]
+    }
+  ]
 }
 ```
 
-- 使用者選擇配置表中的服務商 → **直接從下方 SMTP 配置表讀取對應的 `smtp_server`、`smtp_port`、`ssl_mode`、`auth_type`**，無需使用者再手動輸入。
-- 使用者選「其他 / 自定義」→ 使用 `AskUserQuestion` 分別詢問 SMTP 伺服器位址、連接埠、加密方式。
+取得使用者提供的設定後，直接進入 1d（不再做 TCP 預測試）。
 
-##### 第 3 階段：取得 SMTP 設定後的動作
+---
 
-無論是第 1 階段自動偵測還是第 2 階段配置表匹配，一旦取得 SMTP 設定即進行：
+**最終輸出：** 無論透過哪一步取得設定，將以下變數直接傳遞給 1d：
+- `smtp_server` — SMTP 伺服器位址
+- `smtp_port` — 連接埠
+- `ssl_mode` — 加密方式（ssl / starttls / none）
 
-1. **記錄變數**：`smtp_server`、`smtp_port`、`ssl_mode`、`auth_type`
-2. **回報使用者**（普通文字）："已取得 SMTP 設定：`[server]:[port]`，加密方式：[ssl_mode]"
-3. **繼續至 1d**（獲取密碼/授權碼）
+> **注意：1d 的登入驗證會同時確認連線可達性和認證正確性。若連線失敗，會引導使用者回到 1c 重新選擇 SMTP 設定。**
 
-#### 1d. 取得密碼/授權碼
+#### 1d. 取得密碼 / 授權碼並驗證登入
 
-使用 `AskUserQuestion` 提供輸入框，讓使用者輸入 SMTP 驗證密碼：
+此步驟取得使用者的密碼/授權碼，並**一次性驗證 SMTP 連線與認證**（不做預先 TCP 測試）。
+
+**取得密碼：**
+
+使用 `AskUserQuestion` 提供一個文字輸入框，讓使用者輸入 SMTP 驗證密碼。根據 1c 中取得的郵箱種類資訊，提示對應的認證方式：
 
 ```json
 {
@@ -212,18 +286,22 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py --detect-smtp "�
     "question": "請輸入 SMTP 密碼 / 授權碼 / 應用專用密碼",
     "header": "安全驗證",
     "options": [
-      {"label": "授權碼", "description": "網易/QQ 等需要授權碼，請點擊下方 Other 輸入授權碼"},
-      {"label": "應用專用密碼", "description": "Gmail/iCloud/Yahoo 需要應用專用密碼，請點擊下方 Other 輸入"},
-      {"label": "登入密碼", "description": "Outlook/企業郵箱使用登入密碼，請點擊下方 Other 輸入密碼"}
     ]
   }]
 }
 ```
 
-使用者透過 **Other 自定義輸入框** 輸入密碼/授權碼後，執行連線測試：
+> 根據郵箱種類，可在 question 中附加提示：
+> - 網易/QQ → 「請輸入授權碼（非登入密碼）」
+> - Gmail/iCloud/Yahoo → 「請輸入應用專用密碼（非登入密碼）」
+> - Outlook/企業郵箱 → 「請輸入登入密碼」
+
+**驗證登入（同時驗證連線與認證）：**
+
+使用者透過 **Other 自定義輸入框** 輸入密碼後，執行連線測試：
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --test-connection \
   --sender "sender_email" \
   --smtp-server "smtp_server" \
@@ -232,98 +310,52 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
   --password "使用者提供的密碼"
 ```
 
-- **連線成功** → "驗證成功！" → 進入第 2 步。
-- **連線失敗** → 用文字提示錯誤類型，引導重新輸入或回到 1a。
+**連線成功** → "驗證成功！SMTP 伺服器連線與認證均通過。" → 進入第 2 步。
 
-**安全提醒：密碼僅存在於當前對話的臨時變數中，不回顯。**
-
-
-### 第 2 步：郵件撰寫（互動式表單）
-
-**核心設計：使用 `AskUserQuestion` 同時提供多個輸入框，讓使用者一次填寫所有郵件欄位。**
-
-#### 2a. 郵件基本欄位（收件人、抄送、暗送、主旨）
-
-使用 `AskUserQuestion` 一次提供 4 個輸入框，使用者可同時填寫：
-
-```json
-{
-  "questions": [
-    {
-      "question": "請輸入收件人郵箱地址（多個用逗號分隔）",
-      "header": "收件人",
-      "options": [
-        {"label": "稍後補充", "description": "暫不填寫收件人，稍後再提供"},
-        {"label": "手動輸入", "description": "點擊下方 Other 輸入收件人郵箱地址（多個用逗號分隔）"}
-      ]
-    },
-    {
-      "question": "請輸入抄送對象（選填，多個用逗號分隔）",
-      "header": "抄送",
-      "options": [
-        {"label": "不抄送", "description": "不需要抄送任何人"},
-        {"label": "手動輸入", "description": "點擊下方 Other 輸入抄送郵箱地址（多個用逗號分隔）"}
-      ]
-    },
-    {
-      "question": "請輸入暗送對象（選填，多個用逗號分隔）",
-      "header": "暗送",
-      "options": [
-        {"label": "不暗送", "description": "不需要暗送任何人"},
-        {"label": "手動輸入", "description": "點擊下方 Other 輸入暗送郵箱地址（多個用逗號分隔）"}
-      ]
-    },
-    {
-      "question": "請輸入郵件主旨",
-      "header": "主旨",
-      "options": [
-        {"label": "由 AI 建議", "description": "根據郵件內容由 AI 自動生成主旨"},
-        {"label": "手動輸入", "description": "點擊下方 Other 輸入郵件主旨"}
-      ]
-    }
-  ]
-}
-```
-
-#### 2b. 內文撰寫方式
-
-接著使用 `AskUserQuestion` 提供內文撰寫的兩個選項：
+**連線失敗（認證錯誤）** → 使用 `AskUserQuestion` 讓使用者選擇下一步：
 
 ```json
 {
   "questions": [{
-    "question": "郵件內文如何撰寫？",
-    "header": "內文",
+    "question": "SMTP 登入驗證失敗，密碼/授權碼可能不正確。請選擇下一步：",
+    "header": "登入失敗",
     "options": [
-      {"label": "AI自動生成(根據主旨與附件)", "description": "由 AI 根據主旨與附件內容自動生成專業郵件內文"},
-      {"label": "自行填寫", "description": "點擊下方 Other 自定義輸入郵件內文"}
+      {"label": "重新輸入密碼", "description": "重新提供正確的密碼/授權碼/應用專用密碼"},
+      {"label": "重新輸入郵箱", "description": "回到步驟 1a，重新輸入寄件人郵箱地址"}
     ]
   }]
 }
 ```
 
-**解析使用者回覆：**
+- **若選「重新輸入密碼」** → 回到本步驟的「取得密碼」階段，重新提供 `AskUserQuestion` 讓使用者輸入密碼，然後再次驗證。
+- **若選「重新輸入郵箱」** → 回到步驟 1a，重新開始寄件人設定流程。
 
+**連線失敗（連線/網路錯誤，如連線逾時、拒絕連線、Connection unexpectedly closed 等）** → 使用 `AskUserQuestion` 讓使用者選擇下一步：
+
+```json
+{
+  "questions": [{
+    "question": "SMTP 伺服器連線失敗（非認證問題），可能為伺服器位址不正確或網路受限。請選擇下一步：",
+    "header": "連線失敗",
+    "options": [
+      {"label": "重新設定 SMTP", "description": "回到步驟 1c，重新選擇或輸入 SMTP 伺服器"},
+      {"label": "重新輸入郵箱", "description": "回到步驟 1a，重新開始寄件人設定流程"},
+      {"label": "取消發送", "description": "取消本次郵件發送"}
+    ]
+  }]
+}
 ```
-to_addrs  = 收件人（逗號/分號分隔）；若選「稍後補充」則為空，需後續補充
-cc_addrs  = 抄送（可為空）；若選「不抄送」則為空
-bcc_addrs = 暗送（可為空）；若選「不暗送」則為空
-subject   = 主旨；若選「由 AI 建議」則標記為需 AI 生成
-body_text = 內文；若選「AI自動生成(根據主旨與附件)」→ body_ai_generate = True
-                              若選「自行填寫」→ 使用 Other 輸入的內容
-```
 
-**驗證：**
-- 收件人不可為空 → 若為空，提示"收件人為必填欄位，請提供收件人郵箱地址。"
-- 主旨不可為空 → 若標記為 AI 生成，則根據郵件上下文生成主旨。
+- **若選「重新設定 SMTP」** → 回到步驟 1c，重新確定 SMTP 伺服器設定（可嘗試備用伺服器或使用者自定義）。
+- **若選「重新輸入郵箱」** → 回到步驟 1a，重新開始。
+- **若選「取消發送」** → 停止流程。
 
-**預填條件**：若使用者在觸發時已提供部分資訊（如收件人郵箱、主旨等），在對應欄位的 options 中加入已填值作為預設選項，並告知「已預填部分欄位，請確認或修改。」
+**安全提醒：密碼僅存在於當前對話的臨時變數中，不回顯。**
 
----
 
-### 第 3 步：附件（點選方式）
-
-使用 `AskUserQuestion` 讓使用者選擇是否附加檔案：
+### 第 2 步：附件（點選方式）
+首先判斷用戶是否已經提供了附件，若提供了附件文件則將附件添加入郵件附件，
+否則使用 `AskUserQuestion` 讓使用者選擇是否附加檔案：
 
 ```json
 {
@@ -340,7 +372,7 @@ body_text = 內文；若選「AI自動生成(根據主旨與附件)」→ body_a
 
 **若選「不需要附件」：**
 - `attachments = []`
-- 直接進入第 4 步。
+- 直接進入第 3 步。
 
 **若選「需要附加檔案」：**
 - **停止對話**，告訴使用者：
@@ -353,13 +385,87 @@ body_text = 內文；若選「AI自動生成(根據主旨與附件)」→ body_a
   > - [檔案1名稱]
   > - [檔案2名稱]
   > 將繼續生成郵件。"
-- 進入第 4 步。
+- 進入第 3 步。
 
 **如果使用者在觸發 skill 時已附帶了檔案：**
 - 不再詢問，直接將已偵測到的檔案列入 `attachments`。
 - 告知使用者"已偵測到對話中的檔案：[檔案列表]，將作為附件。"
 
 ---
+
+### 第 3 步：郵件撰寫（互動式表單）
+
+**核心設計：使用 `AskUserQuestion` 同時提供多個輸入框，讓使用者一次填寫所有郵件欄位。**
+
+#### 3a. 郵件基本欄位（收件人、抄送、暗送、主旨）
+
+使用 `AskUserQuestion` 一次提供 4 個輸入框，使用者可同時填寫：
+
+```json
+{
+  "questions": [
+    {
+      "question": "請輸入收件人郵箱地址（多個用逗號分隔）",
+      "header": "收件人",
+      "options": [
+        {"label": "稍後補充", "description": "暫不填寫收件人，稍後再提供"},
+        {"label": "手動輸入", "description": "點擊下方 Other 輸入收件人郵箱地址（多個用逗號分隔）"}
+      ]
+    },
+    {
+      "question": "請輸入抄送對象（選填，多個用逗號分隔）",
+      "header": "抄送"
+    },
+    {
+      "question": "請輸入暗送對象（選填，多個用逗號分隔）",
+      "header": "暗送"
+    },
+    {
+      "question": "請輸入郵件主旨",
+      "header": "主旨",
+      "options": [
+        {"label": "AI 生成", "description": "根據郵件內容由 AI 自動生成主旨"}
+      ]
+    }
+  ]
+}
+```
+
+#### 3b. 內文撰寫方式
+
+接著使用 `AskUserQuestion` 提供內文撰寫的兩個選項：
+
+```json
+{
+  "questions": [{
+    "question": "郵件內文如何撰寫？",
+    "header": "內文",
+    "options": [
+      {"label": "AI自動生成(根據主旨與附件)", "description": "由 AI 根據主旨與附件內容自動生成專業郵件內文"}
+    ]
+  }]
+}
+```
+
+**解析使用者回覆：**
+
+```
+to_addrs  = 收件人（逗號/分號分隔）
+cc_addrs  = 抄送（可為空）
+bcc_addrs = 暗送（可為空）
+subject   = 主旨；若選「由 AI 建議」則標記為需 AI 生成
+body_text = 內文；若選「AI自動生成(根據主旨與附件)」→ body_ai_generate = True
+                              若選「自行填寫」→ 使用 Other 輸入的內容
+```
+
+**驗證：**
+- 收件人不可為空 → 若為空，提示"收件人為必填欄位，請提供收件人郵箱地址。"
+- 主旨不可為空 → 若標記為 AI 生成，則根據郵件上下文生成主旨。
+
+**預填條件**：若使用者在觸發時已提供部分資訊（如收件人郵箱、主旨等），在對應欄位的 options 中加入已填值作為預設選項，並告知「已預填部分欄位，請確認或修改。」
+
+---
+
 
 ### 第 4 步：生成與確認
 
@@ -382,7 +488,7 @@ body_text = 內文；若選「AI自動生成(根據主旨與附件)」→ body_a
 執行預覽命令：
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --preview \
   --sender "sender_email" \
   --smtp-server "smtp_server" \
@@ -425,7 +531,7 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
 執行發送命令（與預覽命令相同參數，移除 `--preview`）：
 
 ```bash
-python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --sender "sender_email" \
   --smtp-server "smtp_server" \
   --smtp-port "smtp_port" \
@@ -512,7 +618,7 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
    - **description**: "個人專屬郵件發送器 — {用戶郵箱}。無需重新輸入 SMTP 設定與密碼。"
    - **content (SKILL.md)**: 以 CC-EmailSender 的完整 SKILL.md 為基礎，進行以下修改：
      - 在最上方 frontmatter 之後新增一個「預設寄件人資訊」區塊（純變數，勿寫入密碼明文到說明文字中）
-     - 將 `--detect-smtp` 步驟標記為「已設定，跳過」
+     - 將第 1 步（1a 取得郵箱、1b 判斷種類、1c SMTP 偵測、1d 密碼）標記為「已設定，跳過」
      - 在 SMTP 命令的範本中，直接代入已儲存的 `sender_email`、`smtp_server`、`smtp_port`、`ssl_mode`、`password`、`display_name`
      - 在資料安全段落中增加備註：「此為個人專屬技能，寄件人資訊已預先設定。」
 
@@ -551,19 +657,19 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
 
 ### 偵測模式
 ```bash
-python send_email.py --detect-smtp "EMAIL"
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --detect-smtp "EMAIL"
 ```
 
-### 連線測試模式
+### 登入驗證模式（取代舊的 TCP 預測試，一併驗證連線與認證）
 ```bash
-python send_email.py --test-connection \
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --test-connection \
   --sender "EMAIL" --smtp-server "SERVER" --smtp-port "PORT" \
   --ssl-mode "ssl|starttls|none" --password "PWD"
 ```
 
 ### 預覽模式
 ```bash
-python send_email.py --preview \
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --preview \
   --sender "EMAIL" --smtp-server "SERVER" --smtp-port "PORT" \
   --ssl-mode "ssl|starttls|none" --password "PWD" \
   --to "TO" --cc "CC" --bcc "BCC" \
@@ -572,7 +678,7 @@ python send_email.py --preview \
 
 ### 發送模式
 ```bash
-python send_email.py \
+python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
   --sender "EMAIL" --smtp-server "SERVER" --smtp-port "PORT" \
   --ssl-mode "ssl|starttls|none" --password "PWD" \
   --to "TO" --cc "CC" --bcc "BCC" \
@@ -584,7 +690,7 @@ python send_email.py \
 | 參數 | 必需 | 說明 |
 |------|------|------|
 | `--detect-smtp EMAIL` | 偵測模式 | 根據郵箱地址偵測 SMTP 設定 |
-| `--test-connection` | 測試模式 | 測試 SMTP 連線和認證 |
+| `--test-connection` | 登入驗證 | 驗證 SMTP 連線與認證（一併完成，不做預先 TCP 測試） |
 | `--preview` | 預覽模式 | 僅預覽不發送 |
 | `--sender EMAIL` | 發送/測試 | 寄件人郵箱 |
 | `--smtp-server ADDR` | 發送/測試 | SMTP 伺服器位址 |
@@ -613,7 +719,7 @@ python send_email.py \
 | 網易 163 | 163.com | smtp.163.com | 465 | SSL | 授權碼 |
 | 網易 126 | 126.com | smtp.126.com | 465 | SSL | 授權碼 |
 | 網易 Yeah | yeah.net | smtp.yeah.net | 465 | SSL | 授權碼 |
-| 網易企業/靈犀 | qiye.163.com, ntes53.netease.com | smtphz.qiye.163.com（華東）<br>smtpv6hz.qiye.ntes53.netease.com（587埠） | 465<br>587 | SSL<br>STARTTLS | 密碼/授權碼 |
+| 網易企業/靈犀 | qiye.163.com, ntes53.netease.com | smtp.qiye.163.com（主）/ smtpv6hz.qiye.ntes53.netease.com（備用） | 465 | SSL | 密碼/授權碼 |
 | QQ 郵箱 | qq.com | smtp.qq.com | 465 | SSL | 授權碼 |
 | Foxmail | foxmail.com | smtp.qq.com | 465 | SSL | 授權碼 |
 | 新浪 | sina.com | smtp.sina.com | 465 | SSL | 密碼 |
@@ -625,49 +731,6 @@ python send_email.py \
 | 未知/企業域名 | * | 詢問使用者 | 詢問 | 詢問 | 詢問 |
 
 完整 SMTP 設定參考見 `references/smtp_settings.md`。
-
----
-
-## SMTP 配置表（依服務商名稱直接匹配）
-
-此配置表用於 **1c-第 2 階段** 的直接匹配流程，在自動偵測失敗時使用。
-**匹配依據**：使用者在 1b 步驟中確認或選擇的 `provider_name`。
-**匹配結果**：直接獲取 `smtp_server`、`smtp_port`、`ssl_mode`、`auth_type`。
-
-| 服務商名稱 (provider_name) | SMTP 伺服器 | 連接埠 | 加密 | 認證方式 |
-|---------------------------|------------|--------|------|----------|
-| 網易企業郵箱 / 靈犀 (新伺服器) | `smtpv6hz.qiye.ntes53.netease.com` | 587 | STARTTLS | 密碼/授權碼 |
-| 網易企業郵箱 / 靈犀 (華東) | `smtphz.qiye.163.com` | 465 | SSL | 密碼/授權碼 |
-| 網易企業郵箱 / 靈犀 (華北) | `smtp.qiye.163.com` | 465 | SSL | 密碼/授權碼 |
-| 網易 163 | `smtp.163.com` | 465 | SSL | 授權碼 |
-| 網易 126 | `smtp.126.com` | 465 | SSL | 授權碼 |
-| 網易 Yeah | `smtp.yeah.net` | 465 | SSL | 授權碼 |
-| 網易 188 | `smtp.188.com` | 465 | SSL | 授權碼 |
-| QQ 郵箱 | `smtp.qq.com` | 465 | SSL | 授權碼 |
-| Foxmail | `smtp.qq.com` | 465 | SSL | 授權碼 |
-| QQ VIP 郵箱 | `smtp.qq.com` | 465 | SSL | 授權碼 |
-| Gmail / Google Workspace | `smtp.gmail.com` | 465 | SSL | 應用專用密碼 |
-| Outlook / Hotmail / Live / MSN | `smtp-mail.outlook.com` | 587 | STARTTLS | 密碼 |
-| Office 365 | `smtp.office365.com` | 587 | STARTTLS | 密碼 |
-| 新浪郵箱 | `smtp.sina.com` | 465 | SSL | 密碼 |
-| 新浪免費郵箱 | `smtp.sina.cn` | 465 | SSL | 密碼 |
-| 搜狐郵箱 | `smtp.sohu.com` | 465 | SSL | 密碼 |
-| 阿里雲郵箱 | `smtp.qiye.aliyun.com` | 465 | SSL | 密碼 |
-| Yahoo 郵箱 | `smtp.mail.yahoo.com` | 465 | SSL | 應用專用密碼 |
-| Yahoo 奇摩 | `smtp.mail.yahoo.com` | 465 | SSL | 應用專用密碼 |
-| Yahoo Japan | `smtp.mail.yahoo.co.jp` | 465 | SSL | 應用專用密碼 |
-| iCloud / Apple | `smtp.mail.me.com` | 587 | STARTTLS | 應用專用密碼 |
-| Zoho 郵箱 | `smtp.zoho.com` | 465 | SSL | 密碼 |
-| ProtonMail (需 Bridge) | `127.0.0.1` (本地) | 1031 | STARTTLS | Bridge 密碼 |
-
-> **使用規則**：在 1c-第 2 階段中，當自動偵測返回 `smtp_server: null` 時：
-> 1. 若使用者在 1b 步驟已手動選擇了服務商名稱 → 直接從上表讀取該服務商的 SMTP 設定
-> 2. 若使用者在 1b 步驟選擇「不正確」且重新選擇了服務商 → 從上表讀取對應設定
-> 3. 若服務商名稱不在上表中 → 使用 `AskUserQuestion` 讓使用者手動輸入 SMTP 伺服器位址與連接埠
->
-> **匹配實例**：使用者郵箱 `admin@company.qiye.163.com`，自動偵測未識別（自定義子域名）。
-> → 使用者在 1b 選擇「不正確」→ 重新選擇「網易企業郵箱 / 靈犀 (新伺服器)」
-> → 上表匹配 provider_name → 獲取 `smtpv6hz.qiye.ntes53.netease.com:587`（STARTTLS）
 
 ---
 
