@@ -68,11 +68,13 @@
 |------|-----|
 | SMTP 伺服器（華東） | `smtphz.qiye.163.com` |
 | SMTP 伺服器（華北） | `smtp.qiye.163.com` |
+| **SMTP 伺服器（新節點）** | **`smtpv6hz.qiye.ntes53.netease.com`** |
 | SSL 連接埠 | 465 / 994 |
 | STARTTLS 連接埠 | 587 |
 | 認證方式 | 登入密碼 或 授權碼 |
 
 > - `hz` = 華東節點。不同地區可能使用不同前綴。
+> - 新節點 `smtpv6hz.qiye.ntes53.netease.com` 使用 **連接埠 587 + STARTTLS**，支援 IPv6。
 > - 部分企業部署需要授權碼而非登入密碼。
 > - 若收到 `535 ERR.LOGIN.REQCODE` 錯誤，請至網頁郵箱 → 設定 → 客戶端設定 → 啟用 SMTP 並生成授權碼。
 
