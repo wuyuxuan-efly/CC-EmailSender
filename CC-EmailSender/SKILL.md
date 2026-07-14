@@ -12,7 +12,7 @@ agent_created: true
 ## 前置需求
 
 - Python 3.x + 標準庫（無外部依賴）
-- 腳本路徑: `C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py`
+- 腳本路徑: `scripts/send_email.py`（相對於技能根目錄；執行命令前請 `cd` 至技能根目錄）
 
 ---
 
@@ -208,7 +208,7 @@ agent_created: true
 **第 (2) 步：從 `--detect-smtp` 與 references/smtp_settings.md 匹配**
 
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --detect-smtp "使用者郵箱"
+python scripts/send_email.py --detect-smtp "使用者郵箱"
 ```
 
 同時參考 `references/smtp_settings.md` 中對應郵箱種類的設定，取兩者中更精確的值。
@@ -301,7 +301,7 @@ python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" 
 使用者透過 **Other 自定義輸入框** 輸入密碼後，執行連線測試：
 
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --test-connection \
   --sender "sender_email" \
   --smtp-server "smtp_server" \
@@ -488,7 +488,7 @@ body_text = 內文；若選「AI自動生成(根據主旨與附件)」→ body_a
 執行預覽命令：
 
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --preview \
   --sender "sender_email" \
   --smtp-server "smtp_server" \
@@ -531,7 +531,7 @@ python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" 
 執行發送命令（與預覽命令相同參數，移除 `--preview`）：
 
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --sender "sender_email" \
   --smtp-server "smtp_server" \
   --smtp-port "smtp_port" \
@@ -644,7 +644,11 @@ python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" 
 {
   "questions": [{
     "question": "請輸入您希望顯示的寄件人名稱（選填，如不填則僅顯示郵箱地址）",
-    "header": "顯示名稱"
+    "header": "顯示名稱",
+    "options": [
+      {"label": "不使用名稱", "description": "僅顯示郵箱地址"},
+      {"label": "自訂名稱", "description": "在 Other 輸入框中填寫顯示名稱"}
+    ]
   }]
 }
 ```
@@ -663,21 +667,23 @@ python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" 
 
 ## 命令參考
 
+> **路徑說明：** 下列所有命令使用相對路徑 `scripts/send_email.py`，執行前請確認當前工作目錄為技能根目錄（即 SKILL.md 所在目錄）。
+
 ### 偵測模式
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --detect-smtp "EMAIL"
+python scripts/send_email.py --detect-smtp "EMAIL"
 ```
 
 ### 登入驗證模式（取代舊的 TCP 預測試，一併驗證連線與認證）
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --test-connection \
+python scripts/send_email.py --test-connection \
   --sender "EMAIL" --smtp-server "SERVER" --smtp-port "PORT" \
   --ssl-mode "ssl|starttls|none" --password "PWD"
 ```
 
 ### 預覽模式
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" --preview \
+python scripts/send_email.py --preview \
   --sender "EMAIL" --smtp-server "SERVER" --smtp-port "PORT" \
   --ssl-mode "ssl|starttls|none" --password "PWD" \
   --to "TO" --cc "CC" --bcc "BCC" \
@@ -686,7 +692,7 @@ python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" 
 
 ### 發送模式
 ```bash
-python "C:\Users\969421\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --sender "EMAIL" --smtp-server "SERVER" --smtp-port "PORT" \
   --ssl-mode "ssl|starttls|none" --password "PWD" \
   --to "TO" --cc "CC" --bcc "BCC" \

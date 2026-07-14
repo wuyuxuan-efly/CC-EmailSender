@@ -19,7 +19,7 @@
 
 ## 安裝
 
-將整個 `CC-EmailSender` 資料夾放到 `~/.workbuddy/skills/` 目錄下（Windows 上為 `C:\Users\<使用者>\.workbuddy\skills\`）。
+將整個 `CC-EmailSender` 資料夾放到 `~/.workbuddy/skills/` 目錄下。
 
 ## 使用方式
 
@@ -148,19 +148,19 @@
 
 ## CLI 直接使用
 
-也可以跳過互動流程，直接用命令列操作：
+也可以跳過互動流程，直接用命令列操作。下列命令使用相對路徑 `scripts/send_email.py`，執行前請先 `cd` 到技能根目錄（即 SKILL.md 所在的 `CC-EmailSender` 資料夾）。
 
 ### 偵測 SMTP 設定
 
 ```bash
-python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --detect-smtp "user@gmail.com"
 ```
 
 ### 測試連線
 
 ```bash
-python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --test-connection \
   --sender "user@gmail.com" \
   --smtp-server "smtp.gmail.com" --smtp-port 465 --ssl-mode ssl \
@@ -170,7 +170,7 @@ python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.
 ### 預覽郵件
 
 ```bash
-python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --preview \
   --sender "user@gmail.com" \
   --smtp-server "smtp.gmail.com" --smtp-port 465 --ssl-mode ssl \
@@ -183,7 +183,7 @@ python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.
 ### 發送郵件
 
 ```bash
-python "C:\Users\kuo.wenhui\.workbuddy\skills\CC-EmailSender\scripts\send_email.py" \
+python scripts/send_email.py \
   --sender "user@gmail.com" \
   --smtp-server "smtp.gmail.com" --smtp-port 465 --ssl-mode ssl \
   --password "app_password" \
