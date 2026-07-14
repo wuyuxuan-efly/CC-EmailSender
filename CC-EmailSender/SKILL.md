@@ -35,119 +35,44 @@ agent_created: true
 
 ## 完整流程（6 步）
 
-> ## ⚠️ 介面規範：所有使用者輸入一律使用 `AskUserQuestion` 工具
+> ## ⚠️ 絕對禁令：禁止輸出任何「卡片 / 輸入框 / 表單」Artifact，禁止調用 `show_widget` / `read_me` / `present_files`
 >
-> **禁止**輸出純文字表格讓使用者在對話框手打填寫（舊版做法，體驗差且易出錯）。
-> **禁止**調用 `show_widget` / `read_me` / `present_files` 渲染卡片或表單。
+> 之前的版本把輸入表格渲染成 WorkBuddy 的 Artifact 卡片（或包在 code block 裡看起來像卡片），
+> 顯示在 chat 中但**無法輸入**，導致流程卡死。
 >
-> **正確做法：使用 `AskUserQuestion` 工具提供互動式輸入框。**
-> 每個需要使用者輸入的欄位，都透過 `AskUserQuestion` 的 `question` + `options` 提供。
-> 使用者可點選預設選項，也可透過底部的 **Other 自定義輸入框** 輸入任意文字。
+> **正確做法：直接在對話回覆文字中輸出純文字表格。** 不要調用 widget 工具、不要包 code block、不要生成 HTML/SVG。
+> 卡片只是視覺引導，真正的輸入位置是對話框（使用者在下方打字 → 我從對話框讀取）。
 >
-> **設計原則：**
-> - 每個 `question` 的 `options` 至少 2 個，包含合理預設值或快捷選項。
-> - 使用者需自由輸入文字時，點選對應 option 後在 **Other** 輸入框中填寫。
-> - 多個獨立欄位可在同一個 `AskUserQuestion` 中同時呈現（最多 4 個 question）。
+> 範例格式：
+> ```
+> 📧 寄件人設定
+> ─────────────────
+> 寄件人郵箱：__________________
+> ─────────────────
+> 請直接在下方對話框輸入您的郵箱地址。
+> ```
+> 以上範例是文字，不是程式碼。實際輸出時**不要包在 ``` 裡面**。直接寫在回覆中。
 
 ---
 
-### 第 1 步：寄件人設定（郵箱 → 服務商分析與確認 → 偵測 → 密碼）
+### 第 1 步：寄件人設定（郵箱 → 偵測 → 密碼）
 
-#### 1a. 判斷並取得寄件人郵箱
+**非循序問答。直接在對話回覆中輸出純文字表格，使用者在下方對話框填寫。對話不停頓。**
 
-**首先判斷使用者是否已在初始訊息中提供寄件人郵箱地址。**
+#### 1a. 要求郵箱地址
 
-判斷規則：掃描使用者的觸發訊息，尋找電子郵箱格式（如 `xxx@xxx.com`、`xxx@xxx.com.cn` 等）。
+**直接在回覆文字中輸出純文字表格（不要包在 ``` 裡，不要調用任何工具）：**
 
-**情況 A — 使用者已提供寄件人郵箱：**
+範例：
 
-直接使用該郵箱作為寄件人，**無需再次詢問**。
-立即進入服務商分析（見 1b-服務商分析與確認）。
+📧 寄件人設定
+─────────────────
+寄件人郵箱：__________________
+─────────────────
 
-**情況 B — 使用者未提供寄件人郵箱：**
+請直接在下方對話框輸入您的郵箱地址。
 
-僅顯示一個輸入框，讓使用者直接輸入寄件人郵箱地址，不要在同一步驟中混入服務商選項：
-
-```json
-{
-  "questions": [{
-    "question": "請輸入寄件人郵箱地址",
-    "header": "寄件人郵箱",
-    "options": []
-  }]
-}
-```
-
-使用者透過底部 **Other 自定義輸入框** 輸入完整郵箱地址後，進入 1b 的服務商分析與確認。
-
-#### 1b. 郵箱服務商分析與確認
-
-**取得寄件人郵箱後，首先根據郵箱域名分析其所屬服務商，然後讓使用者確認分析是否正確。**
-
-##### 域名分析規則（依程式邏輯判斷，不呼叫外部命令）
-
-根據郵箱地址的 @ 後綴進行分析：
-
-| 域名後綴 | 服務商 |
-|---------|--------|
-| `@gmail.com` | Gmail |
-| `@outlook.com` / `@hotmail.com` / `@live.com` / `@msn.com` | Outlook |
-| `@qq.com` / `@foxmail.com` / `@vip.qq.com` | QQ郵箱 |
-| `@163.com` / `@126.com` / `@yeah.net` / `@188.com` | 網易 |
-| `@qiye.163.com` | 網易企業郵箱/靈犀 |
-| `@yahoo.com` / `@yahoo.com.tw` / `@yahoo.co.jp` | Yahoo |
-| `@icloud.com` / `@me.com` / `@mac.com` | iCloud |
-| `@sina.com` / `@sina.cn` | 新浪 |
-| `@sohu.com` | 搜狐 |
-| `@aliyun.com` | 阿里雲 |
-| `@zoho.com` | Zoho |
-| 無法匹配以上規則 | 未知服務商 / 企業自定義域名 |
-
-##### 使用 AskUserQuestion 讓使用者確認分析結果
-
-```json
-{
-  "questions": [{
-    "question": "分析您的郵箱為 **［服務商名稱］**，是否正確？",
-    "header": "服務商確認",
-    "options": [
-      {"label": "正確", "description": "服務商識別正確，繼續執行 SMTP 偵測"},
-      {"label": "不正確", "description": "服務商識別錯誤，重新選擇服務商"}
-    ]
-  }]
-}
-```
-
-**處理邏輯：**
-
-**若選「正確」：** 使用已分析的服務商資訊，繼續執行 SMTP 偵測（見 1c-偵測）。
-
-**若選「不正確」：** 使用第二個 `AskUserQuestion` 提供四個主要選項，並在 Other 中提供手動輸入框：
-
-```json
-{
-  "questions": [{
-    "question": "請選擇正確的郵箱服務商，或在下方 Other 中輸入自定義服務商名稱",
-    "header": "選擇服務商",
-    "options": [
-      {"label": "網易", "description": "163/126/yeah.net/企業郵箱等"},
-      {"label": "Outlook", "description": "Outlook/Hotmail/Live/Office365"},
-      {"label": "QQ郵箱", "description": "QQ/Foxmail 郵箱"},
-      {"label": "Gmail", "description": "Google Gmail 郵箱服務"}
-    ]
-  }]
-}
-```
-
-- 若使用者點選上述四個選項之一 → 記錄所選服務商。
-- 若使用者點選 **Other** → 在手動輸入框中填寫自定義服務商名稱（如"新浪"、"iCloud"、"企業自定義"等）。
-- 記錄最終確定的服務商名稱後，繼續執行 SMTP 偵測（見 1c-偵測）。
-
-> **設計原則：** 即使使用者糾正了服務商，後續的 `--detect-smtp` 腳本仍然會根據郵箱首碼進行自動偵測。使用者的選擇主要用於引導後續的密碼類型提示（授權碼 vs 應用專用密碼 vs 登入密碼）。
-
-#### 1c-偵測：SMTP 自動偵測
-
-取得寄件人郵箱並確認服務商後，執行偵測命令：
+使用者回覆郵箱後，執行自動偵測：
 
 ```bash
 python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py --detect-smtp "使用者郵箱"
@@ -159,25 +84,22 @@ python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py --detect-smtp "�
 - 已知 → "已識別為 **[provider_name]**，伺服器 `[server]:[port]`。"
 - 未知 → 用 `AskUserQuestion` 讓使用者選擇加密方式（SSL/STARTTLS/不加密），並請提供 SMTP 伺服器位址。
 
-#### 1d. 取得密碼/授權碼
+#### 1b. 要求密碼/授權碼
 
-使用 `AskUserQuestion` 提供輸入框，讓使用者輸入 SMTP 驗證密碼：
+**直接在回覆文字中輸出純文字表格（不要包在 ``` 裡，不要調用任何工具）：**
 
-```json
-{
-  "questions": [{
-    "question": "請輸入 SMTP 密碼 / 授權碼 / 應用專用密碼",
-    "header": "安全驗證",
-    "options": [
-      {"label": "授權碼", "description": "網易/QQ 等需要授權碼，請點擊下方 Other 輸入授權碼"},
-      {"label": "應用專用密碼", "description": "Gmail/iCloud/Yahoo 需要應用專用密碼，請點擊下方 Other 輸入"},
-      {"label": "登入密碼", "description": "Outlook/企業郵箱使用登入密碼，請點擊下方 Other 輸入密碼"}
-    ]
-  }]
-}
-```
+範例：
 
-使用者透過 **Other 自定義輸入框** 輸入密碼/授權碼後，執行連線測試：
+🔐 安全驗證
+─────────────────
+提供商：[provider_name]
+需要：[auth_label]
+密碼 / 授權碼：__________________
+─────────────────
+
+請直接在下方對話框中輸入您的 [密碼/授權碼/應用專用密碼]。
+
+使用者回覆後，執行連線測試：
 
 ```bash
 python ~/.workbuddy/skills/CC-EmailSender/scripts/send_email.py \
